@@ -1,0 +1,4 @@
+# Ignorar bibliotecas pesadas e arquivos de cache
+node_modules/
+venv/
+__pycache__/
