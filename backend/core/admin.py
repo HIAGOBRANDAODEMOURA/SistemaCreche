@@ -1,10 +1,22 @@
 from django.contrib import admin
-from .models import Turma, Aluno, RegistroRotina
+from .models import Professor, Responsavel, Turma, Aluno, RegistroRotina
 
-# Isso já cria interfaces completas de busca e filtro para a diretora!
+@admin.register(Professor)
+class ProfessorAdmin(admin.ModelAdmin):
+    list_display = ('nome_completo', 'cpf', 'telefone')
+    search_fields = ('nome_completo', 'cpf')
+    ordering = ('nome_completo',)
+
+@admin.register(Responsavel)
+class ResponsavelAdmin(admin.ModelAdmin):
+    list_display = ('nome_completo', 'cpf', 'telefone', 'grau_parentesco')
+    search_fields = ('nome_completo', 'cpf')
+    ordering = ('nome_completo',)
+
 @admin.register(Turma)
 class TurmaAdmin(admin.ModelAdmin):
     list_display = ('nome', 'professor')
+    list_filter = ('professor',)
 
 @admin.register(Aluno)
 class AlunoAdmin(admin.ModelAdmin):

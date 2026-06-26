@@ -1,23 +1,19 @@
 from rest_framework import serializers
-from .models import Turma, Aluno, RegistroRotina
-from django.utils import timezone
-
-class AlunoSerializer(serializers.ModelSerializer):
-    turma_nome = serializers.CharField(source='turma.nome', read_only=True)
-    # Criamos um campo novo calculado dinamicamente
-    status = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Aluno
-        fields = ['id', 'nome', 'turma', 'turma_nome', 'status']
-
-    # Essa função verifica se já existe uma rotina HOJE para esse aluno
-    def get_status(self, obj):
-        hoje = timezone.now().date()
-        ja_preencheu = RegistroRotina.objects.filter(aluno=obj, data=hoje).exists()
-        return 'preenchido' if ja_preencheu else 'pendente'
+from .models import Aluno, RegistroRotina
 
 class RegistroRotinaSerializer(serializers.ModelSerializer):
     class Meta:
         model = RegistroRotina
+        fields = '__all__'
+
+class AlunoSerializer(serializers.ModelSerializer):
+    # Traz a lista de rotinas do aluno
+    rotinas = RegistroRotinaSerializer(many=True, read_only=True)
+    
+    # Busca os nomes reais nas tabelas conectadas para facilitar a vida do frontend
+    turma_nome = serializers.CharField(source='turma.nome', read_only=True, default='Sem turma')
+    responsavel_nome = serializers.CharField(source='responsavel.nome_completo', read_only=True, default='Sem responsável')
+
+    class Meta:
+        model = Aluno
         fields = '__all__'
