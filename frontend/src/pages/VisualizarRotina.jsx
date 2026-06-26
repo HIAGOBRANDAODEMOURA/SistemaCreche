@@ -1,132 +1,126 @@
-import React, { useState, useEffect } from 'react';
-import { Activity, Utensils, Thermometer, Calendar, Heart, ShieldCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
-export default function VisualizarRotina({ token }) {
-  const [rotina, setRotina] = useState(null);
-  const [carregando, setCarregando] = useState(true);
+export default function VisualizarRotina() {
+  const [filhos, setFilhos] = useState([]);
+  const [erro, setErro] = useState('');
 
-  // Simulando a busca da rotina do filho (na Fase 2 traremos filtrado pelo ID do filho do Usuário)
   useEffect(() => {
-    fetch('http://localhost:8000/api/rotinas/')
-      .then(resposta => resposta.json())
-      .then(dados => {
-        // Pega a rotina mais recente cadastrada no banco de dados
-        if (dados.length > 0) {
-          setRotina(dados[dados.length - 1]);
-        }
-        setCarregando(false);
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setErro('Sessão expirada. Por favor, faça o login novamente.');
+      return;
+    }
+
+    fetch('http://localhost:8000/api/alunos/', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Token ${token}` }
+    })
+      .then(response => {
+        if (!response.ok) throw new Error('Falha ao carregar os dados.');
+        return response.json();
       })
-      .catch(erro => {
-        console.error("Erro ao buscar rotina:", erro);
-        setCarregando(false);
-      });
+      .then(data => { if (Array.isArray(data)) setFilhos(data); })
+      .catch(() => setErro('Não foi possível carregar as informações do aluno.'));
   }, []);
 
-  if (carregando) {
-    return (
-      <div className="flex flex-col items-center justify-center mt-20 text-slate-500">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p>Carregando o dia do seu pequeno...</p>
-      </div>
-    );
-  }
-
-  if (!rotina) {
-    return (
-      <div className="max-w-md mx-auto p-4 mt-10 text-center bg-white rounded-2xl shadow-sm border">
-        <Heart className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-        <p className="text-slate-600 font-medium">Nenhuma rotina registrada para hoje ainda.</p>
-        <p className="text-slate-400 text-sm mt-1">As professoras atualizarão assim que possível!</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-md mx-auto p-4 space-y-6 pb-12">
-      
-      {/* Cabeçalho da Agenda Digital */}
-      <header className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6 rounded-2xl shadow-md text-center">
-        <p className="text-xs uppercase tracking-wider opacity-80 flex items-center justify-center gap-1">
-          <Calendar className="w-3 h-3" /> Diário de Bordo
-        </p>
-        <h1 className="text-2xl font-bold mt-1">Acompanhe seu Filho</h1>
-        <div className="mt-3 inline-block bg-white/20 px-3 py-1 rounded-full text-xs font-medium">
-          Data: {new Date(rotina.data).toLocaleDateString('pt-BR')}
-        </div>
-      </header>
-
-      {/* SEÇÃO 1: VIVÊNCIAS */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-3">
-        <h3 className="font-bold text-blue-600 flex items-center gap-2 text-md">
-          <Activity className="w-5 h-5" /> Atividades e Vivências
-        </h3>
-        <p className="text-sm text-slate-600">
-          <span className="font-semibold text-slate-700">Acolhida e Oração:</span> {rotina.acolhida}
-        </p>
-        <div>
-          <span className="text-sm font-semibold text-slate-700 block mb-2">Estímulos do dia:</span>
-          <div className="flex flex-wrap gap-2">
-            {rotina.estimulacao.map((item, index) => (
-              <span key={index} className="bg-blue-50 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-md border border-blue-100">
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
+    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+        <h2 style={{ color: '#1e3a8a', margin: 0 }}>Rotina do Berçário</h2>
+        <button onClick={() => { localStorage.removeItem('token'); window.location.reload(); }} style={{ padding: '8px 16px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+          Sair
+        </button>
       </div>
 
-      {/* SEÇÃO 2: ALIMENTAÇÃO */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-        <h3 className="font-bold text-orange-500 flex items-center gap-2 text-md">
-          <Utensils className="w-5 h-5" /> Alimentação
-        </h3>
-        <div className="grid grid-cols-1 gap-3">
-          {[
-            { label: 'Lanche da Manhã', valor: rotina.lanche_manha },
-            { label: 'Almoço', valor: rotina.almoco },
-            { label: 'Lanche da Tarde', valor: rotina.lanche_tarde }
-          ].map((ref, idx) => (
-            <div key={idx} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <span className="text-sm font-semibold text-slate-700">{ref.label}</span>
-              <span className={`text-xs font-bold px-3 py-1 rounded-full ${ref.valor === 'Bem' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-orange-50 text-orange-700 border border-orange-100'}`}>
-                {ref.valor}
-              </span>
+      {erro && <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '12px', borderRadius: '6px', marginBottom: '20px' }}>{erro}</div>}
+
+      {filhos.length > 0 ? (
+        filhos.map(filho => {
+          const ultimaRotina = filho.rotinas && filho.rotinas.length > 0 ? filho.rotinas[filho.rotinas.length - 1] : null;
+
+          return (
+            <div key={filho.id} style={{ marginBottom: '30px', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+              <div style={{ backgroundColor: '#f3f4f6', padding: '15px 20px', borderBottom: '1px solid #e5e7eb' }}>
+                <h3 style={{ margin: 0, color: '#1f2937', textTransform: 'uppercase' }}>{filho.nome}</h3>
+                <small style={{ color: '#6b7280' }}>Data do Registro: {ultimaRotina ? new Date(ultimaRotina.data).toLocaleDateString('pt-BR') : 'N/A'}</small>
+              </div>
+
+              <div style={{ padding: '20px', backgroundColor: 'white' }}>
+                {ultimaRotina ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    
+                    <div style={{ backgroundColor: '#f8fafc', padding: '15px', borderRadius: '6px', borderLeft: '4px solid #3b82f6' }}>
+                      <strong style={{ color: '#1e40af' }}>Acolhida/Oração:</strong> {ultimaRotina.acolhida || '-'}
+                    </div>
+
+                    {/* Estimulação - Renderiza como "Tags" coloridas */}
+                    <div style={{ backgroundColor: '#fdf4ff', padding: '15px', borderRadius: '6px', border: '1px solid #fbcfe8' }}>
+                      <strong style={{ color: '#86198f', display: 'block', marginBottom: '10px' }}>Estimulação / Vivências:</strong>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {ultimaRotina.estimulacao && ultimaRotina.estimulacao.length > 0 ? (
+                          ultimaRotina.estimulacao.map((item, idx) => (
+                            <span key={idx} style={{ backgroundColor: '#fae8ff', color: '#701a75', padding: '5px 10px', borderRadius: '15px', fontSize: '13px' }}>{item}</span>
+                          ))
+                        ) : <span style={{ color: '#a21caf', fontSize: '13px' }}>-</span>}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+                      <div style={{ backgroundColor: '#f0fdf4', padding: '12px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                        <strong style={{ color: '#166534' }}>Lanche da Manhã:</strong>
+                        <div style={{ color: '#15803d', marginTop: '4px' }}>{ultimaRotina.lanche_manha || '-'}</div>
+                      </div>
+                      <div style={{ backgroundColor: '#fffbeb', padding: '12px', borderRadius: '6px', border: '1px solid #fef08a' }}>
+                        <strong style={{ color: '#92400e' }}>Almoço:</strong>
+                        <div style={{ color: '#b45309', marginTop: '4px' }}>{ultimaRotina.almoco || '-'}</div>
+                      </div>
+                      <div style={{ backgroundColor: '#f0fdf4', padding: '12px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                        <strong style={{ color: '#166534' }}>Lanche da Tarde:</strong>
+                        <div style={{ color: '#15803d', marginTop: '4px' }}>{ultimaRotina.lanche_tarde || '-'}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                      <div style={{ border: '1px solid #e2e8f0', padding: '12px', borderRadius: '6px', backgroundColor: '#f9fafb' }}>
+                        <strong style={{ color: '#475569' }}>Descanso / Soneca:</strong>
+                        <div style={{ marginTop: '4px', color: '#64748b' }}>{ultimaRotina.soneca || '-'}</div>
+                      </div>
+                      <div style={{ border: '1px solid #fecaca', padding: '12px', borderRadius: '6px', backgroundColor: ultimaRotina.febre === 'Sim' ? '#fef2f2' : 'white' }}>
+                        <strong style={{ color: ultimaRotina.febre === 'Sim' ? '#991b1b' : '#475569' }}>Febre:</strong>
+                        <div style={{ marginTop: '4px', color: '#64748b' }}>
+                          {ultimaRotina.febre} {ultimaRotina.temperatura && `(${ultimaRotina.temperatura}ºC)`}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Higiene - Renderiza como "Tags" */}
+                    <div style={{ backgroundColor: '#eff6ff', padding: '15px', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
+                      <strong style={{ color: '#1e40af', display: 'block', marginBottom: '10px' }}>Higiene e Hidratação:</strong>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {ultimaRotina.higiene && ultimaRotina.higiene.length > 0 ? (
+                          ultimaRotina.higiene.map((item, idx) => (
+                            <span key={idx} style={{ backgroundColor: '#dbeafe', color: '#1e40af', padding: '5px 10px', borderRadius: '15px', fontSize: '13px' }}>{item}</span>
+                          ))
+                        ) : <span style={{ color: '#3b82f6', fontSize: '13px' }}>-</span>}
+                      </div>
+                    </div>
+                    
+                    <div style={{ marginTop: '10px', textAlign: 'right', color: '#64748b', fontSize: '13px', fontWeight: 'bold' }}>
+                      Pedagoga Responsável: {ultimaRotina.pedagoga || 'Não informada'}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '30px 0', color: '#6b7280' }}>
+                    <p>Ainda não há nenhuma rotina registrada hoje para {filho.nome}.</p>
+                  </div>
+                )}
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* SEÇÃO 3: SAÚDE E HIGIENE */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-3">
-        <h3 className="font-bold text-teal-600 flex items-center gap-2 text-md">
-          <Thermometer className="w-5 h-5" /> Saúde e Bem-estar
-        </h3>
-        <p className="text-sm text-slate-600 flex justify-between border-b pb-2 border-slate-50">
-          <span className="font-semibold text-slate-700">Descanso / Soneca:</span> {rotina.soneca}
-        </p>
-        <p className="text-sm text-slate-600 flex justify-between border-b pb-2 border-slate-50">
-          <span className="font-semibold text-slate-700">Teve febre?</span> 
-          <span className={rotina.febre === 'Sim' ? 'text-red-600 font-bold' : ''}>
-            {rotina.febre} {rotina.temperatura ? `(${rotina.temperatura})` : ''}
-          </span>
-        </p>
-        <div>
-          <span className="text-sm font-semibold text-slate-700 block mb-2">Cuidados de Higiene realizados:</span>
-          <div className="flex flex-wrap gap-2">
-            {rotina.higiene.map((item, index) => (
-              <span key={index} className="bg-teal-50 text-teal-700 text-xs font-medium px-2.5 py-1 rounded-md border border-teal-100">
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* RODAPÉ: ASSINATURA */}
-      <div className="bg-slate-100 p-4 rounded-xl text-center flex items-center justify-center gap-2 text-xs text-slate-500 font-medium border border-slate-200">
-        <ShieldCheck className="w-4 h-4 text-emerald-600" /> Registro assinado por: {rotina.pedagoga}
-      </div>
-
+          );
+        })
+      ) : (
+        !erro && <p style={{ color: '#4b5563' }}>Buscando informações do aluno...</p>
+      )}
     </div>
   );
 }

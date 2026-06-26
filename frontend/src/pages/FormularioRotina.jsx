@@ -1,267 +1,221 @@
-import React, { useState } from 'react';
-import { ChevronLeft, Save, Activity, Utensils, Thermometer, Droplets } from 'lucide-react';
+import { useState } from 'react';
 
-export default function FormularioRotina({ aluno, onVoltar }) {
-  const [respostas, setRespostas] = useState({
+export default function FormularioRotina({ alunoId, alunoNome, onVoltar }) {
+  const pedagogaSalva = localStorage.getItem('pedagoga_nome') || '';
+
+  const [formData, setFormData] = useState({
+    aluno: alunoId,
     acolhida: '',
     estimulacao: [],
-    lancheManha: '',
-    almoco: '',
-    lancheTarde: '',
+    lanche_manha_aceitacao: '',
+    lanche_manha_opcao: '',
+    almoco_aceitacao: '',
+    almoco_opcao: '',
+    lanche_tarde_aceitacao: '',
+    lanche_tarde_opcao: '',
     soneca: '',
     febre: '',
     temperatura: '',
     hidratacao: '',
     higiene: [],
-    pedagoga: ''
+    pedagoga: pedagogaSalva
   });
+  
+  const [status, setStatus] = useState({ tipo: '', mensagem: '' });
 
-  const [salvando, setSalvando] = useState(false);
-
-  const selecionarRadio = (campo, valor) => {
-    setRespostas({ ...respostas, [campo]: valor });
-  };
-
-  const alternarCheckbox = (campo, valor) => {
-    const listaAtual = respostas[campo];
-    if (listaAtual.includes(valor)) {
-      setRespostas({ ...respostas, [campo]: listaAtual.filter(item => item !== valor) });
+  const handleChange = (e) => {
+    // Se o usuário marcar que NÃO teve febre, limpamos automaticamente qualquer temperatura que estivesse digitada
+    if (e.target.name === 'febre' && e.target.value === 'Não') {
+      setFormData({ ...formData, febre: e.target.value, temperatura: '' });
     } else {
-      setRespostas({ ...respostas, [campo]: [...listaAtual, valor] });
+      setFormData({ ...formData, [e.target.name]: e.target.value });
     }
   };
 
-  // Função que envia os dados para o Django
-  const handleSalvar = async () => {
-    setSalvando(true);
+  const handleCheckbox = (e, fieldName) => {
+    const { value, checked } = e.target;
+    setFormData(prev => {
+      const lista = prev[fieldName];
+      if (checked) {
+        return { ...prev, [fieldName]: [...lista, value] };
+      } else {
+        return { ...prev, [fieldName]: lista.filter(item => item !== value) };
+      }
+    });
+  };
 
-    // Formata os dados exatamente como o model do Django espera
-    const dadosParaEnviar = {
-      aluno: aluno.id,
-      acolhida: respostas.acolhida || 'Não preenchido',
-      estimulacao: respostas.estimulacao,
-      lanche_manha: respostas.lancheManha || 'Não preenchido',
-      almoco: respostas.almoco || 'Não preenchido',
-      lanche_tarde: respostas.lancheTarde || 'Não preenchido',
-      soneca: respostas.soneca || 'Não preenchido',
-      febre: respostas.febre || 'Não preenchido',
-      temperatura: respostas.temperatura,
-      hidratacao: respostas.hidratacao || 'Não preenchido',
-      higiene: respostas.higiene,
-      pedagoga: respostas.pedagoga || 'Não preenchida'
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    localStorage.setItem('pedagoga_nome', formData.pedagoga);
+    setStatus({ tipo: 'loading', mensagem: 'Salvando rotina...' });
+
+    const payload = {
+      aluno: formData.aluno,
+      acolhida: formData.acolhida,
+      estimulacao: formData.estimulacao,
+      lanche_manha: formData.lanche_manha_aceitacao ? `${formData.lanche_manha_aceitacao}${formData.lanche_manha_opcao ? ' | Opção: ' + formData.lanche_manha_opcao : ''}` : '',
+      almoco: formData.almoco_aceitacao ? `${formData.almoco_aceitacao}${formData.almoco_opcao ? ' | Opção: ' + formData.almoco_opcao : ''}` : '',
+      lanche_tarde: formData.lanche_tarde_aceitacao ? `${formData.lanche_tarde_aceitacao}${formData.lanche_tarde_opcao ? ' | Opção: ' + formData.lanche_tarde_opcao : ''}` : '',
+      soneca: formData.soneca,
+      febre: formData.febre,
+      temperatura: formData.temperatura,
+      higiene: formData.hidratacao ? [...formData.higiene, `Hidratação: ${formData.hidratacao}`] : formData.higiene,
+      pedagoga: formData.pedagoga
     };
 
-    try {
-      const respostaApi = await fetch('http://localhost:8000/api/rotinas/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dadosParaEnviar)
+    fetch('http://localhost:8000/api/rotinas/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Token ${token}`
+      },
+      body: JSON.stringify(payload)
+    })
+      .then(response => {
+        if (!response.ok) throw new Error('Erro ao salvar');
+        return response.json();
+      })
+      .then(() => {
+        setStatus({ tipo: 'sucesso', mensagem: 'Rotina salva com sucesso!' });
+        setTimeout(() => onVoltar(), 2000);
+      })
+      .catch(error => {
+        console.error(error);
+        setStatus({ tipo: 'erro', mensagem: 'Falha ao salvar a rotina. Tente novamente.' });
       });
-
-      if (respostaApi.ok) {
-        alert('✅ Rotina salva com sucesso no banco de dados!');
-        onVoltar(); // Devolve a professora para a lista de alunos
-      } else {
-        const erro = await respostaApi.json();
-        console.error("Erro do servidor:", erro);
-        alert('⚠️ Ops! Verifique se faltou preencher algo.');
-      }
-    } catch (erro) {
-      console.error("Erro de conexão:", erro);
-      alert('⚠️ Erro ao tentar conectar com o servidor.');
-    } finally {
-      setSalvando(false);
-    }
   };
 
+  const radioStyle = { display: 'flex', gap: '5px', alignItems: 'center', fontWeight: 'normal' };
+  const checkStyle = { display: 'flex', gap: '8px', alignItems: 'center', fontWeight: 'normal', color: '#4b5563' };
+
   return (
-    <div className="max-w-md mx-auto bg-white min-h-screen shadow-md relative pb-24">
-      
-      {/* Cabeçalho Fixo */}
-      <div className="sticky top-0 bg-white border-b border-slate-100 p-4 flex items-center gap-3 z-10 shadow-sm">
-        <button onClick={onVoltar} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-slate-200 transition-colors">
-          <ChevronLeft className="w-5 h-5" />
+    <div style={{ backgroundColor: '#ffffff', padding: '25px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h3 style={{ color: '#1e3a8a', margin: 0 }}>Rotina Berçário: {alunoNome}</h3>
+        <button onClick={onVoltar} style={{ padding: '8px 12px', backgroundColor: '#6b7280', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+          Voltar
         </button>
-        <div>
-          <h2 className="text-lg font-bold leading-tight text-slate-800">{aluno.nome}</h2>
-          <p className="text-xs text-slate-500">{new Date().toLocaleDateString('pt-BR')}</p>
-        </div>
       </div>
 
-      {/* Corpo do Formulário */}
-      <div className="p-4 space-y-8 mt-2">
+      {status.mensagem && (
+        <div style={{ padding: '12px', borderRadius: '6px', marginBottom: '20px', fontWeight: 'bold', backgroundColor: status.tipo === 'sucesso' ? '#dcfce7' : status.tipo === 'erro' ? '#fee2e2' : '#e0f2fe', color: status.tipo === 'sucesso' ? '#166534' : status.tipo === 'erro' ? '#991b1b' : '#075985' }}>
+          {status.mensagem}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
-        {/* SEÇÃO 1: ATIVIDADES */}
-        <section className="space-y-4">
-          <h3 className="font-bold text-blue-600 flex items-center gap-2 text-lg border-b border-slate-100 pb-2">
-            <Activity className="w-5 h-5" /> Atividades e Vivências
-          </h3>
+        <div style={{ padding: '15px', backgroundColor: '#f9fafb', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+          <strong style={{ display: 'block', marginBottom: '10px' }}>Acolhida/Oração:</strong>
+          <div style={{ display: 'flex', gap: '15px' }}>
+            <label style={radioStyle}><input type="radio" name="acolhida" value="Sim" onChange={handleChange} /> Sim</label>
+            <label style={radioStyle}><input type="radio" name="acolhida" value="Não" onChange={handleChange} /> Não</label>
+          </div>
+        </div>
+
+        <div style={{ padding: '15px', backgroundColor: '#fdf4ff', borderRadius: '6px', border: '1px solid #fbcfe8' }}>
+          <strong style={{ display: 'block', marginBottom: '10px', color: '#86198f' }}>Estimulação / Vivências:</strong>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            {['Estímulos sensoriais', 'Música / Sons', 'Brincadeiras no tapete', 'Exploração de objetos/texturas', 'Motricidade'].map(item => (
+              <label key={item} style={checkStyle}>
+                <input type="checkbox" value={item} onChange={(e) => handleCheckbox(e, 'estimulacao')} /> {item}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ padding: '15px', backgroundColor: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <strong style={{ color: '#166534' }}>Alimentação:</strong>
           
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <p className="text-sm font-semibold mb-3 text-slate-700">Acolhida / Oração:</p>
-            <div className="flex gap-3">
-              {['Sim', 'Não'].map(opcao => (
-                <button 
-                  key={opcao}
-                  onClick={() => selecionarRadio('acolhida', opcao)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${respostas.acolhida === opcao ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}
-                >
-                  {opcao}
-                </button>
+          <div>
+            <span style={{ fontWeight: 'bold', fontSize: '14px' }}>Lanche / Manhã:</span>
+            <div style={{ display: 'flex', gap: '15px', marginTop: '5px', marginBottom: '8px' }}>
+              {['Bem', 'Pouco', 'Não aceitou'].map(op => (
+                <label key={'lm_'+op} style={radioStyle}><input type="radio" name="lanche_manha_aceitacao" value={op} onChange={handleChange} /> {op}</label>
               ))}
+            </div>
+            <input type="text" name="lanche_manha_opcao" placeholder="Opção:" value={formData.lanche_manha_opcao} onChange={handleChange} style={{ padding: '8px', width: '100%', borderRadius: '4px', border: '1px solid #d1d5db' }} />
+          </div>
+
+          <div style={{ borderTop: '1px solid #bbf7d0', paddingTop: '15px' }}>
+            <span style={{ fontWeight: 'bold', fontSize: '14px' }}>Almoço:</span>
+            <div style={{ display: 'flex', gap: '15px', marginTop: '5px', marginBottom: '8px' }}>
+              {['Bem', 'Pouco', 'Não aceitou'].map(op => (
+                <label key={'al_'+op} style={radioStyle}><input type="radio" name="almoco_aceitacao" value={op} onChange={handleChange} /> {op}</label>
+              ))}
+            </div>
+            <input type="text" name="almoco_opcao" placeholder="Opção:" value={formData.almoco_opcao} onChange={handleChange} style={{ padding: '8px', width: '100%', borderRadius: '4px', border: '1px solid #d1d5db' }} />
+          </div>
+
+          <div style={{ borderTop: '1px solid #bbf7d0', paddingTop: '15px' }}>
+            <span style={{ fontWeight: 'bold', fontSize: '14px' }}>Lanche da tarde:</span>
+            <div style={{ display: 'flex', gap: '15px', marginTop: '5px', marginBottom: '8px' }}>
+              {['Bem', 'Pouco', 'Não aceitou'].map(op => (
+                <label key={'lt_'+op} style={radioStyle}><input type="radio" name="lanche_tarde_aceitacao" value={op} onChange={handleChange} /> {op}</label>
+              ))}
+            </div>
+            <input type="text" name="lanche_tarde_opcao" placeholder="Opção:" value={formData.lanche_tarde_opcao} onChange={handleChange} style={{ padding: '8px', width: '100%', borderRadius: '4px', border: '1px solid #d1d5db' }} />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+          <div style={{ padding: '15px', backgroundColor: '#f9fafb', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+            <strong style={{ display: 'block', marginBottom: '10px' }}>Descanso / Soneca:</strong>
+            <div style={{ display: 'flex', gap: '15px' }}>
+              <label style={radioStyle}><input type="radio" name="soneca" value="Sim" onChange={handleChange} /> Sim</label>
+              <label style={radioStyle}><input type="radio" name="soneca" value="Não" onChange={handleChange} /> Não</label>
             </div>
           </div>
 
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <p className="text-sm font-semibold mb-3 text-slate-700">Estimulação / Vivências:</p>
-            <div className="space-y-3">
-              {['Estímulos sensoriais', 'Música / Sons', 'Brincadeiras no tapete', 'Exploração de objetos/texturas', 'Motricidade'].map(opcao => (
-                <label key={opcao} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-200 cursor-pointer hover:border-blue-300">
-                  <input 
-                    type="checkbox" 
-                    checked={respostas.estimulacao.includes(opcao)}
-                    onChange={() => alternarCheckbox('estimulacao', opcao)}
-                    className="w-5 h-5 rounded text-blue-600" 
-                  />
-                  <span className="text-sm text-slate-700">{opcao}</span>
-                </label>
-              ))}
+          <div style={{ padding: '15px', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
+            <strong style={{ display: 'block', marginBottom: '10px', color: '#991b1b' }}>Febre:</strong>
+            <div style={{ display: 'flex', gap: '15px', marginBottom: '10px' }}>
+              <label style={radioStyle}><input type="radio" name="febre" value="Sim" onChange={handleChange} checked={formData.febre === 'Sim'} /> Sim</label>
+              <label style={radioStyle}><input type="radio" name="febre" value="Não" onChange={handleChange} checked={formData.febre === 'Não'} /> Não</label>
             </div>
-          </div>
-        </section>
-
-        {/* SEÇÃO 2: ALIMENTAÇÃO */}
-        <section className="space-y-4">
-          <h3 className="font-bold text-orange-500 flex items-center gap-2 text-lg border-b border-slate-100 pb-2">
-            <Utensils className="w-5 h-5" /> Alimentação
-          </h3>
-          
-          {[
-            { id: 'lancheManha', label: 'Lanche / Manhã' },
-            { id: 'almoco', label: 'Almoço' },
-            { id: 'lancheTarde', label: 'Lanche da Tarde' }
-          ].map(refeicao => (
-            <div key={refeicao.id} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <p className="text-sm font-semibold mb-3 text-slate-700">{refeicao.label}:</p>
-              <div className="flex gap-2">
-                {['Bem', 'Pouco', 'Não aceitou'].map(opcao => (
-                  <button 
-                    key={opcao}
-                    onClick={() => selecionarRadio(refeicao.id, opcao)}
-                    className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-colors ${respostas[refeicao.id] === opcao ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300'}`}
-                  >
-                    {opcao}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {/* SEÇÃO 3: SAÚDE E HIGIENE */}
-        <section className="space-y-4">
-          <h3 className="font-bold text-teal-600 flex items-center gap-2 text-lg border-b border-slate-100 pb-2">
-            <Thermometer className="w-5 h-5" /> Saúde e Bem-estar
-          </h3>
-
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
-            <p className="text-sm font-semibold text-slate-700">Descanso / Soneca:</p>
-            <div className="flex gap-2">
-              {['Sim', 'Não'].map(opcao => (
-                <button 
-                  key={opcao}
-                  onClick={() => selecionarRadio('soneca', opcao)}
-                  className={`px-5 py-2 rounded-lg text-sm font-medium border transition-colors ${respostas.soneca === opcao ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}
-                >
-                  {opcao}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold text-slate-700">Teve Febre?</p>
-              <div className="flex gap-2">
-                {['Sim', 'Não'].map(opcao => (
-                  <button 
-                    key={opcao}
-                    onClick={() => selecionarRadio('febre', opcao)}
-                    className={`px-5 py-2 rounded-lg text-sm font-medium border transition-colors ${respostas.febre === opcao ? 'bg-red-500 text-white border-red-500' : 'bg-white text-slate-600 border-slate-200 hover:border-red-300'}`}
-                  >
-                    {opcao}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {respostas.febre === 'Sim' && (
+            
+            {/* O campo de temperatura só aparece se "Sim" estiver selecionado */}
+            {formData.febre === 'Sim' && (
               <input 
                 type="text" 
-                placeholder="Qual a temperatura? (Ex: 38.5°C)" 
-                value={respostas.temperatura}
-                onChange={(e) => setRespostas({ ...respostas, temperatura: e.target.value })}
-                className="w-full p-3 rounded-lg border border-slate-300 text-sm focus:outline-red-400 mt-2" 
+                name="temperatura" 
+                placeholder="Informe a temperatura:" 
+                value={formData.temperatura} 
+                onChange={handleChange} 
+                style={{ padding: '8px', width: '100%', borderRadius: '4px', border: '1px solid #d1d5db', marginTop: '10px' }} 
               />
             )}
           </div>
-
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <p className="text-sm font-semibold mb-3 text-slate-700 flex items-center gap-2">
-              <Droplets className="w-4 h-4 text-blue-400" /> Higiene:
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {['Banho', 'Evacuação', 'Troca de fralda', 'Escovação'].map(opcao => (
-                <label key={opcao} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 cursor-pointer hover:border-teal-300">
-                  <input 
-                    type="checkbox" 
-                    checked={respostas.higiene.includes(opcao)}
-                    onChange={() => alternarCheckbox('higiene', opcao)}
-                    className="w-4 h-4 rounded text-teal-600" 
-                  />
-                  <span className="text-xs text-slate-700 font-medium">{opcao}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* SEÇÃO 4: ASSINATURA */}
-        <section className="space-y-4">
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <p className="text-sm font-semibold mb-3 text-slate-700">Pedagoga Responsável:</p>
-            <input 
-              type="text" 
-              placeholder="Nome da professora"
-              value={respostas.pedagoga}
-              onChange={(e) => setRespostas({ ...respostas, pedagoga: e.target.value })}
-              className="w-full p-3 rounded-lg border border-slate-300 text-sm focus:outline-blue-500" 
-            />
-          </div>
-        </section>
-
-      </div>
-
-      {/* Botão Salvar Flutuante */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
-        <div className="max-w-md mx-auto">
-          <button 
-            onClick={handleSalvar}
-            disabled={salvando}
-            className={`w-full text-white font-bold py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${salvando ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-          >
-            {salvando ? (
-              <span>Salvando...</span>
-            ) : (
-              <>
-                <Save className="w-5 h-5" /> Salvar Rotina
-              </>
-            )}
-          </button>
         </div>
-      </div>
 
+        <div style={{ padding: '15px', backgroundColor: '#eff6ff', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
+          <strong style={{ display: 'block', marginBottom: '10px', color: '#1e40af' }}>Hidratação:</strong>
+          <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+            <label style={radioStyle}><input type="radio" name="hidratacao" value="Ideal" onChange={handleChange} /> Ideal</label>
+            <label style={radioStyle}><input type="radio" name="hidratacao" value="Abaixo do ideal" onChange={handleChange} /> Abaixo do ideal</label>
+          </div>
+
+          <strong style={{ display: 'block', marginBottom: '10px', color: '#1e40af' }}>Higiene:</strong>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            {['Banho', 'Evacuação', 'Troca de fralda', 'Escovação'].map(item => (
+              <label key={item} style={checkStyle}>
+                <input type="checkbox" value={item} onChange={(e) => handleCheckbox(e, 'higiene')} /> {item}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: '5px', fontWeight: 'bold', color: '#374151' }}>
+          Pedagoga Responsável:
+          <input type="text" name="pedagoga" value={formData.pedagoga} onChange={handleChange} required style={{ padding: '10px', borderRadius: '4px', border: '1px solid #d1d5db', backgroundColor: '#f3f4f6' }} />
+          <small style={{ color: '#6b7280', fontWeight: 'normal' }}>*O sistema lembrará deste nome para os próximos registros.</small>
+        </label>
+
+        <button type="submit" disabled={status.tipo === 'loading'} style={{ padding: '15px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px', marginTop: '10px' }}>
+          {status.tipo === 'loading' ? 'Salvando...' : 'Salvar Rotina'}
+        </button>
+      </form>
     </div>
   );
 }
