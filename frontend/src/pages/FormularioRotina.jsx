@@ -64,7 +64,7 @@ export default function FormularioRotina({ alunoId, alunoNome, onVoltar }) {
       pedagoga: formData.pedagoga
     };
 
-    fetch('http://localhost:8000/api/rotinas/', {
+    fetch('${import.meta.env.VITE_API_URL}/api/rotinas/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
